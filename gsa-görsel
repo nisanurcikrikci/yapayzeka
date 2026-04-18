@@ -23,7 +23,7 @@ n_dim = 2
 # Ayarlar
 G0 = 100            # Başlangıç yerçekimi sabiti
 G_reduction_rate = 0.95 # Her iterasyonda G %5 azalır (Savrulmayı durdurur)
-add_iter_count = 100 # 'O' tuşuna basıldığında kaç iterasyon ekleneceği
+add_iter_count = 50 # 'O' tuşuna basıldığında kaç iterasyon ekleneceği
 eps = 1e-5
 step = 0 
 current_iter = 0
@@ -34,8 +34,8 @@ plt.subplots_adjust(bottom=0.3)
 
 def update_plot(text_info="", pause_time=0):
     ax.clear()
-    ax.set_xlim(-15, 15)
-    ax.set_ylim(-15, 15)
+    ax.set_xlim(-50, 50)
+    ax.set_ylim(-50, 50)
     ax.axhline(0, color='black', lw=1, alpha=0.3)
     ax.axvline(0, color='black', lw=1, alpha=0.3)
     ax.grid(True, linestyle='--', alpha=0.5)
@@ -166,6 +166,6 @@ def on_key(event):
         update_plot(final_info)
 
 # İlk ekranı göster
-update_plot("Sunum Görselleştiricisi Başlatıldı.\nBaşlamak için 'ENTER' tuşuna basın.\n(O tuşu ile her seferinde 100 iterasyon ekleyebilirsiniz)")
+update_plot("Sunum Görselleştiricisi Başlatıldı.\nBaşlamak için 'ENTER' tuşuna basın.\n(O tuşu ile her seferinde 50 iterasyon ekleyebilirsiniz)")
 fig.canvas.mpl_connect('key_press_event', on_key)
 plt.show()
