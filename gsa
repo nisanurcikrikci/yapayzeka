@@ -1,0 +1,77 @@
+import numpy as np
+
+def gsa_optimization(obj_func, dim, n_agents, max_iter):
+
+    # --- 1. Başlatma ---------------------------------------------------------
+
+    # Parçacıkların konumlarını rastgele oluştur (-10 ile 10 arası)
+    pos = np.random.uniform(-10, 10, (n_agents, dim)) #her ajan problemin çözüm adayıdır
+    vel = np.zeros((n_agents, dim)) # Hızlar başlangıçta sıfır.çünkü kimse hareket etmez
+    
+    g_constant = 100 # Başlangıç yerçekimi sabiti (G0)
+    best_fitness_history = []
+
+    for iteration in range(max_iter):
+
+        # --- 2. Uygunluk Değerlerini Hesapla -------------------------------------
+
+        fitness = np.apply_along_axis(obj_func, 1, pos) #Her ajanın bulunduğu konumun kalitesi ölçülür (örneğin hedef noktaya ne kadar yakın?).
+        
+        # En iyi ve en kötü değerleri bul (Minimizasyon problemi için)
+        best_f = np.min(fitness) #O anki döngüde (yinelemede), tüm ajanlar (parçacıklar) arasında en iyi sonucu (en düşük değeri) kimin bulduğunu tespit ediyor.
+        worst_f = np.max(fitness)#O anki döngüde en kötü sonucu (en yüksek değeri) kimin bulduğunu buluyor.
+        best_fitness_history.append(best_f)
+        #Ne yapıyor? Her döngüde bulunan o "en iyi" değeri bir listeye (günlüğe) kaydediyor.
+        #Neden önemli? Algoritma bittiğinde bir grafik çizip; "Acaba çözüm zamanla iyileşti mi?", "Algoritma bir noktada takılıp kaldı mı?" yoksa "Hızlıca sonuca ulaştı mı?" diye bakabilmemizi sağlar.
+
+        # --- 3. Kütle Hesaplama --------------------------------------------------
+
+        # Uygunluk değerine göre kütleleri normalize et
+        # İyi sonuç veren (düşük fitness) daha ağır olur
+        m = (fitness - worst_f) / (best_f - worst_f + 1e-10)
+        #Üst Kısım Her ajanın başarısını, gruptaki en kötü performansla kıyaslar.
+        #Alt Kısım Gruptaki en iyi ile en kötü arasındaki toplam farktır.
+        #Neden Yapılıyor? Eğer bir ajanın sonucu worst_f (en kötü) ise, üst taraf 0 olacağı için m değeri 0 çıkar. Eğer ajanın sonucu best_f (en iyi) ise, üst ve alt eşitleneceği için m değeri 1 çıkar.
+        #1e-10 nedir? Eğer tüm ajanlar aynı sonucu bulursa best_f ve worst_f eşit olur. Bu durumda payda 0 olacağı için bilgisayar hata verir. Bu küçük sayı (sıfıra çok yakın), "sıfıra bölünme" hatasını engellemek için eklenen bir güvenlik önlemidir.
+        
+        mass = m / np.sum(m) # Toplam kütleye oranla
+
+        # --- 4. Yerçekimi Sabitini Güncelle ------------------------------------------------
+
+        # G zamanla azalır (Keşiften sömürüye geçiş)
+        # G büyükken parçacıklar birbirini çok sert çeker,
+        #bu sayede tüm arama uzayını hızla gezerler
+        #G küçülür, böylece parçacıklar hedefin etrafında aşırı hızlanıp hedefi ıskalamazlar
+        G = g_constant * np.exp(-20 * iteration / max_iter)
+
+        # --- 5. Kuvvet ve İvme Hesaplama ---------------------------------------
+
+        acceleration = np.zeros((n_agents, dim))
+        
+        for i in range(n_agents):
+            force_total = np.zeros(dim)
+            for j in range(n_agents):
+                if i != j:
+                    # Öklid mesafesi (R)
+                    dist = np.linalg.norm(pos[i] - pos[j]) + 1e-10   #İki parçacık arasındaki kuş uçuşu mesafeyi (Öklid mesafesi) hesaplıyor.
+                    
+                    force_ij = G * (mass[i] * mass[j] / dist) * (pos[j] - pos[i])# Newton'un çekim formülü: F = G * (M1*M2 / R)
+                    force_total += np.random.rand() * force_ij  #farklı ihtimalleri denemesini sağlar.
+            
+            # İvme: a = F / m
+            acceleration[i] = force_total / (mass[i] + 1e-10)#bir sonraki adımda ne kadar "hızlanacağını" bulur.
+
+        # --- 6. Hız ve Konum Güncelleme -----------------------------------------------
+
+        # v(t+1) = rand * v(t) + a
+        vel = np.random.rand() * vel + acceleration  #yeni hızı oluşturur.
+        pos = pos + vel  
+
+    return best_f, best_fitness_history
+
+# Örnek kullanım: Sphere Fonksiyonu (Hedef: Tüm x'lerin 0 olması)
+def sphere_function(x):
+    return np.sum(x**2)
+
+best_score, history = gsa_optimization(sphere_function, dim=2, n_agents=20, max_iter=50)
+print(f"En iyi sonuç: {best_score}")
