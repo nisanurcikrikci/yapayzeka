@@ -1,0 +1,164 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import time
+
+# --- 1. KULLANICI GİRDİLERİ ---
+print("--- Yerçekimsel Arama Algoritması (GSA) Görselleştirici ---")
+try:
+    n_agents = int(input("Kaç tane ajan (örnek) oluşturmak istersiniz? "))
+except:
+    n_agents = 3
+    print("Geçersiz girdi, varsayılan olarak 3 ajan atandı.")
+
+positions = []
+for i in range(n_agents):
+    coords = input(f"Ajan {i+1} için x,y koordinatlarını girin (Örn: 5,-3): ")
+    x, y = map(float, coords.split(','))
+    positions.append([x, y])
+
+positions = np.array(positions)
+velocities = np.zeros_like(positions)
+n_dim = 2
+
+# Ayarlar
+G0 = 100       # Başlangıç yerçekimi sabiti
+alpha = 20     # G'nin azalma katsayısı
+max_iter = 100 # Otomatik tamamlama için maksimum iterasyon
+eps = 1e-5
+step = 0 
+current_iter = 0
+
+# --- 2. GÖRSELLEŞTİRME KURULUMU ---
+fig, ax = plt.subplots(figsize=(10, 8))
+plt.subplots_adjust(bottom=0.3)
+
+def update_plot(text_info="", pause_time=0):
+    ax.clear()
+    ax.set_xlim(-15, 15)
+    ax.set_ylim(-15, 15)
+    ax.axhline(0, color='black', lw=1, alpha=0.3)
+    ax.axvline(0, color='black', lw=1, alpha=0.3)
+    ax.grid(True, linestyle='--', alpha=0.5)
+    ax.set_title(f"GSA Optimizasyonu (İterasyon: {current_iter})", fontsize=14, fontweight='bold')
+    
+    # Ajanları çiz
+    for i in range(len(positions)):
+        ax.scatter(positions[i, 0], positions[i, 1], s=100)
+        ax.text(positions[i, 0]+0.3, positions[i, 1]+0.3, f"A{i+1}", fontsize=11, fontweight='bold')
+    
+    # Merkez (Hedef: 0,0)
+    ax.scatter(0, 0, color='red', marker='x', s=100, label="Global Minimum (0,0)")
+    ax.legend(loc="upper right")
+    
+    # Bilgi metnini yazdır
+    plt.figtext(0.12, 0.05, text_info, fontsize=10, bbox=dict(facecolor='#f0f0f0', alpha=0.9), family='monospace')
+    plt.draw()
+    if pause_time > 0:
+        plt.pause(pause_time)
+
+# --- 3. HESAPLAMA VE ADIMLAR ---
+def on_key(event):
+    global step, positions, velocities, current_iter
+    
+    # ADIM ADIM İLERLEME (ENTER TUŞU)
+    if event.key == 'enter':
+        step += 1
+        
+        if step == 1:
+            fitness = np.sum(positions**2, axis=1)
+            best_idx = np.argmin(fitness)
+            worst_idx = np.argmax(fitness)
+            
+            info = "--- ADIM 1: UYGUNLUK (FITNESS) HESABI ---\n"
+            for i in range(n_agents):
+                info += f"A{i+1} fitness: {positions[i,0]:.2f}^2 + {positions[i,1]:.2f}^2 = {fitness[i]:.2f}\n"
+            info += f"\nEn iyi: {fitness[best_idx]:.2f} (A{best_idx+1}) | En kötü: {fitness[worst_idx]:.2f} (A{worst_idx+1})"
+            update_plot(info)
+
+        elif step == 2:
+            fitness = np.sum(positions**2, axis=1)
+            best = np.min(fitness)
+            worst = np.max(fitness)
+            
+            m = (fitness - worst) / (best - worst + eps)
+            M = m / (np.sum(m) + eps)
+            
+            info = "--- ADIM 2: KÜTLE (MASS) DÖNÜŞTÜRME ---\n"
+            for i in range(n_agents):
+                info += f"A{i+1} -> Normalize Kütle (M): {M[i]:.3f}\n"
+            info += "\n(En iyi çözüme sahip olan ajan en ağır kütleyi aldı!)"
+            update_plot(info)
+            fig.M = M
+
+        elif step == 3:
+            M = fig.M
+            acc = np.zeros_like(positions)
+            G = G0 * np.exp(-alpha * current_iter / max_iter) # G zamanla küçülür
+            
+            for i in range(n_agents):
+                total_force = np.zeros(2)
+                for j in range(n_agents):
+                    if i != j:
+                        dist = np.linalg.norm(positions[i] - positions[j]) + eps
+                        force_mag = G * (M[i] * M[j]) / dist
+                        direction = positions[j] - positions[i]
+                        total_force += np.random.rand() * force_mag * direction
+                acc[i] = total_force / (M[i] + eps)
+            
+            velocities = np.random.rand() * velocities + acc
+            positions = positions + velocities
+            current_iter += 1
+            
+            info = f"--- ADIM 3: İVME VE HAREKET (G Sabiti: {G:.2f}) ---\n"
+            for i in range(n_agents):
+                info += f"A{i+1} Yeni Konum: [{positions[i,0]:.2f}, {positions[i,1]:.2f}]\n"
+            info += "\n(Kütleler hareket etti! Otomatik hızlandırmak için 'O' tuşuna basın.)"
+            
+            update_plot(info)
+            step = 0 
+
+    # OTOMATİK HIZLI ÇÖZÜM (O TUŞU)
+    elif event.key == 'o' or event.key == 'O':
+        info = "Otomatik iterasyonlar başlatıldı... Lütfen bekleyin."
+        update_plot(info)
+        
+        for t in range(current_iter, max_iter):
+            fitness = np.sum(positions**2, axis=1)
+            best = np.min(fitness)
+            worst = np.max(fitness)
+            
+            m = (fitness - worst) / (best - worst + eps)
+            M = m / (np.sum(m) + eps)
+            
+            G = G0 * np.exp(-alpha * t / max_iter)
+            acc = np.zeros_like(positions)
+            
+            for i in range(n_agents):
+                total_force = np.zeros(2)
+                for j in range(n_agents):
+                    if i != j:
+                        dist = np.linalg.norm(positions[i] - positions[j]) + eps
+                        force_mag = G * (M[i] * M[j]) / dist
+                        direction = positions[j] - positions[i]
+                        total_force += np.random.rand() * force_mag * direction
+                acc[i] = total_force / (M[i] + eps)
+            
+            velocities = np.random.rand() * velocities + acc
+            positions = positions + velocities
+            current_iter = t + 1
+            
+            # Her 10 iterasyonda bir ekranda animasyon göster
+            if t % 10 == 0 or t == max_iter - 1:
+                update_plot(f"İterasyon: {t+1}/{max_iter} hesaplanıyor...\nAjanlar (0,0) noktasına yakınsıyor!\nŞu anki G sabiti: {G:.4f}", pause_time=0.1)
+
+        # Sonuç ekranı
+        final_info = f"--- OPTİMİZASYON TAMAMLANDI! ({max_iter}. İterasyon) ---\n"
+        for i in range(n_agents):
+            final_info += f"A{i+1} Son Konum: [{positions[i,0]:.4f}, {positions[i,1]:.4f}]\n"
+        final_info += "\nTüm kütleler (0,0) global minimum noktasında başarıyla birleşti!"
+        update_plot(final_info)
+
+# İlk ekranı göster
+update_plot("Başlamak için 'ENTER' tuşuna basın.\n(Adım adım gitmek için ENTER, hızlıca sonuca gitmek için 'O' tuşuna basın)")
+fig.canvas.mpl_connect('key_press_event', on_key)
+plt.show()
